@@ -412,9 +412,10 @@ int find_sequence_adaptor(const char *s, const struct encode *a, int m, unsigned
     int i;
     l = strlen(s);    
     uint64_t x = 0;
-    uint64_t mask = 0xFFFFFFFFFFFFFFFF;
+    //uint64_t mask = 0xFFFFFFFFFFFFFFFF;
     for ( i = 0; i < l; ++i) {
-        x = (x<<4|(tab[s[i]]&0xf))&mask;
+        x = x<<4|(tab[s[i]]&0xf);
+        //debug_print("%d\t%d\t%d\t%d\t%d", n, a->l, countbits(x&a->x), a->l -m, i);
         if ( ++n >= a->l) {
             if ( x == a->x ||countbits(x&a->x) >= a->l - m) return i-a->l;
         }
@@ -483,8 +484,10 @@ void *trim_core(void *_p, int idx)
             if ( l0 != l1 ) {
                 l0 = l0 > l1 && l1 > 0 ? l1 : l0;
                 l1 = l1 > l0 && l0 > 0 ? l0 : l1;
-                if ( b->l1 < args.mini_frag ) b->flag = MINI_SKIP;
-                else b->flag = TRIMMED;
+                b->flag = DROP_POLL;
+                    
+                //if ( b->l1 < args.mini_frag ) b->flag = MINI_SKIP;
+                //else b->flag = TRIMMED;
                 continue;               
             }
         }
