@@ -285,9 +285,10 @@ struct args {
 void memory_release()
 {
     if ( args.report_fp) {
-        fprintf(args.report_fp, "trimmed reads (pairs): %llu\n", args.stat.trimmed);
-        fprintf(args.report_fp, "fragment smaller than %d: %llu\n", args.mini_frag, args.stat.small);
-        fprintf(args.report_fp, "dropped polluted reads: %llu\n", args.stat.dropped);
+        fprintf(args.report_fp, "All reads (pairs): %llu\n", args.stat.all_fragments);
+        fprintf(args.report_fp, "Trimmed reads (pairs): %llu\n", args.stat.trimmed);
+        fprintf(args.report_fp, "Fragment smaller than %d: %llu\n", args.mini_frag, args.stat.small);
+        fprintf(args.report_fp, "Dropped polluted reads: %llu\n", args.stat.dropped);
         fclose(args.report_fp);    
     }
     free(args.base_tab);
@@ -515,6 +516,7 @@ int write_out(struct bseq_pool *p)
          
     for ( i = 0; i < p->n; ++i ) {
         struct bseq *b = &p->s[i];
+        opts->stat.all_fragments++;
         if ( b->flag == MINI_SKIP ) opts->stat.small++;
         else if (b->flag == DROP_POLL ) opts->stat.dropped++;
         else {
