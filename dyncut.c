@@ -482,12 +482,16 @@ void *trim_core(void *_p, int idx)
 
             // Inconsistant, trim as many as possible
             if ( l0 != l1 ) {
-                l0 = l0 > l1 && l1 > 0 ? l1 : l0;
-                l1 = l1 > l0 && l0 > 0 ? l0 : l1;
-                b->flag = DROP_POLL;
+                if (l0 > 0 && l1 > 0) {
+                    b->l0 = l0 > l1 && l1 > 0 ? l1 : l0;
+                    b->l1 = l1 > l0 && l0 > 0 ? l0 : l1;
                     
-                //if ( b->l1 < args.mini_frag ) b->flag = MINI_SKIP;
-                //else b->flag = TRIMMED;
+                    if ( b->l1 < args.mini_frag ) b->flag = MINI_SKIP;
+                    else b->flag = TRIMMED;
+                }
+                else {
+                    b->flag = DROP_POLL;
+                }
                 continue;               
             }
         }
