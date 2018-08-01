@@ -93,6 +93,7 @@ int usage()
             "  -tail [0]            Trimmed both ends if no adaptor detected.\n"
             "  -adaptor [seq]       Adaptor sequences. Default is 19bp mosaic ends.\n"
             "  -report [report.txt] Export report summary.\n"
+            "  -fail [fails.txt]    Names of droped reads.\n"
             "  -d                   Drop reads if reversed adaptor detected.\n"
             "  -t [1]               Threads.\n"
             "\n"
@@ -244,6 +245,7 @@ struct args {
     const char *output_fname1;
     const char *output_fname2;
     const char *report_fname;
+    const char *fail_fname;
     
     int n_thread;
     int se_mode;
@@ -259,7 +261,8 @@ struct args {
     gzFile r1_out;
     gzFile r2_out;
     FILE *report_fp;
-
+    FILE *fail_fp;
+    
     kseq_t *k1;
     kseq_t *k2;
 
@@ -275,6 +278,7 @@ struct args {
     .output_fname1 = NULL,
     .output_fname2 = NULL,
     .report_fname = NULL,
+    .fail_fname = NULL,
     .n_thread = 1,
     .se_mode = 0,
     .mismatch = 1,
@@ -286,6 +290,7 @@ struct args {
     .k1 = NULL,
     .k2 = NULL,
     .report_fp = NULL,
+    .fail_fp = NULL,
     .r1_fp = NULL,
     .r2_fp = NULL,
     .r1_out = NULL,
@@ -305,6 +310,8 @@ void memory_release()
         fprintf(args.report_fp, "Dropped polluted reads: %llu\n", args.stat.dropped);
         fclose(args.report_fp);    
     }
+                
+    if ( args.fail_fp ) fclose(args.fail_fp);
     free(args.base_tab);
     free(args.rev_tab);
     free(args.me_or_ada);
@@ -345,6 +352,7 @@ int parse_args(int argc, char **argv)
         else if ( strcmp(a, "-2") == 0 ) var = &args.output_fname2;
         else if ( strcmp(a, "-adaptor") == 0 ) var = &args.adaptor;
         else if ( strcmp(a, "-report") == 0 ) var = &args.report_fname;
+        else if ( strcmp(a, "-fail") == 0 ) var = &args.fail_fname;
         else if ( strcmp(a, "-m") == 0 ) var = &mis;
         else if ( strcmp(a, "-l") == 0 ) var = &mini;
         else if ( strcmp(a, "-t") == 0 ) var = &thread;
@@ -420,6 +428,11 @@ int parse_args(int argc, char **argv)
     if ( args.report_fname ) {
         args.report_fp = fopen(args.report_fname, "w");
         if ( args.report_fp == NULL ) error("%s : %s.", args.report_fname, strerror(errno));
+    }
+
+    if ( args.fail_fname ) {
+        args.fail_fp = fopen(args.fail_fname, "w");
+        if ( args.fail_fp == NULL ) error("%s : %s.", args.fail_fname, strerror(errno));
     }
     return 0;
 }
@@ -593,10 +606,13 @@ int write_out(struct bseq_pool *p)
     for ( i = 0; i < p->n; ++i ) {
         struct bseq *b = &p->s[i];
         opts->stat.all_fragments++;
-        if ( b->flag == MINI_SKIP ) opts->stat.small++;
+        if ( b->flag == MINI_SKIP ) {
+            opts->stat.small++;
+            if (opts->fail_fp) fprintf(opts->fail_fp, "%s\n", b->n0);
+        }
         else if (b->flag == DROP_POLL ) {
-            //debug_print("%d\t%d\t%d", b->l0, b->l1, b->l0 - b->l1);
             opts->stat.dropped++;
+            if (opts->fail_fp) fprintf(opts->fail_fp, "%s\n", b->n0);
         }
         else {
             if (b->flag == TRIMMED ) opts->stat.trimmed++;
