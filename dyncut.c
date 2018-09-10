@@ -145,7 +145,7 @@ struct bseq {
     char *n0, *s0, *q0;
     int l0;
     // read 2
-    char *s1, *q1;
+    char *n1, *s1, *q1;
     int l1;
 };
 struct bseq_pool {
@@ -170,7 +170,7 @@ void bseq_pool_destroy(struct bseq_pool *p)
             if (b->q0) free(b->q0);
         }
         if (b->l1) {
-            //free(b->n1);
+            free(b->n1);
             free(b->s1);
             if (b->q1) free(b->q1);
         }
@@ -221,7 +221,7 @@ struct bseq_pool *bseq_read(kseq_t *k1, kseq_t *k2, int chunk_size, int pe)
             s->l0 = k1->seq.l;
             size += s->l0;
 
-            //s->n1 = strdup(k1->name.s);
+            s->n1 = strdup(k1->name.s);
             s->s1 = strdup(k2->seq.s);
             s->q1 = k2->qual.l? strdup(k2->qual.s) : 0;
             s->l1 = k2->seq.l;
@@ -631,7 +631,7 @@ int write_out(struct bseq_pool *p)
             }
             if ( opts->is_pe ) {
                 kputc('@', &str2);
-                kputs(b->n0, &str2);
+                kputs(b->n1, &str2);
                 kputc('\n', &str2);
                 kputsn(b->s1, b->l1, &str2);
                 kputc('\n', &str2);
