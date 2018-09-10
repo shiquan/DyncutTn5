@@ -63,6 +63,8 @@ static int check_name(kstring_t name1, kstring_t name2)
 {
     char *s1 = name1.s;
     char *s2 = name2.s;
+    // int l;
+    // if ( name1.s[name1.l-2] == '/' ) l = name1.l-2;
     size_t n;
     for(n = 0; n < name1.l - 1; ++n, ++s1, ++s2) {
         if (*s1 != *s2) return 1;
@@ -221,7 +223,7 @@ struct bseq_pool *bseq_read(kseq_t *k1, kseq_t *k2, int chunk_size, int pe)
             s->l0 = k1->seq.l;
             size += s->l0;
 
-            s->n1 = strdup(k1->name.s);
+            s->n1 = strdup(k2->name.s);
             s->s1 = strdup(k2->seq.s);
             s->q1 = k2->qual.l? strdup(k2->qual.s) : 0;
             s->l1 = k2->seq.l;
