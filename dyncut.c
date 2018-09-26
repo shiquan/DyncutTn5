@@ -89,7 +89,7 @@ int usage()
             "Options:\n"
             "  -1 [output1.fq.gz]   Output fastq 1 file or smart pairing file (ignore fastq 2).\n"
             "  -2 [output2.fq.gz]   Output fastq 2 file.\n"
-            "  -S                   Trim PE reads in SE mode.\n"
+            //"  -S                   Trim PE reads in SE mode.\n"
             "  -m [1]               Allowed mismatches on the adaptor.\n"            
             "  -l [20]              Minimal fragment to keep.\n"
             "  -tail [0]            Trimmed both ends if no adaptor detected.\n"
@@ -248,6 +248,7 @@ struct args {
     const char *output_fname2;
     const char *report_fname;
     const char *fail_fname;
+    const char *se_fname;
     
     int n_thread;
     int se_mode;
@@ -281,6 +282,8 @@ struct args {
     .output_fname2 = NULL,
     .report_fname = NULL,
     .fail_fname = NULL,
+    .se_fname = NULL,
+    
     .n_thread = 1,
     .se_mode = 0,
     .mismatch = 1,
@@ -306,8 +309,8 @@ struct args {
 void memory_release()
 {
     if ( args.report_fp) {
-        fprintf(args.report_fp, "All reads (pairs): %llu\n", args.stat.all_fragments);
-        fprintf(args.report_fp, "Trimmed reads (pairs): %llu\n", args.stat.trimmed);
+        fprintf(args.report_fp, "All reads (or pairs): %llu\n", args.stat.all_fragments);
+        fprintf(args.report_fp, "Trimmed reads (or pairs): %llu\n", args.stat.trimmed);
         fprintf(args.report_fp, "Fragment smaller than %d: %llu\n", args.mini_frag, args.stat.small);
         fprintf(args.report_fp, "Dropped polluted reads: %llu\n", args.stat.dropped);
         fclose(args.report_fp);    
@@ -359,10 +362,7 @@ int parse_args(int argc, char **argv)
         else if ( strcmp(a, "-l") == 0 ) var = &mini;
         else if ( strcmp(a, "-t") == 0 ) var = &thread;
         else if ( strcmp(a, "-tail") == 0 ) var = &t3;        
-        else if ( strcmp(a, "-S") == 0 ) {
-            args.se_mode = 1;
-            continue;
-        }
+        // else if ( strcmp(a, "-s") == 0 ) var = &args.se_fname;
         else if ( strcmp(a, "-d") == 0 ) {
             args.drop_poll = 1;
             continue;
@@ -401,7 +401,7 @@ int parse_args(int argc, char **argv)
     args.revada = revcode(args.me_or_ada);
     
     if ( args.input_fname1 == NULL && (!isatty(fileno(stdin))) )
-        args.input_fname1 = "-";
+        args.input_fname1 = "-";    
     if ( args.input_fname1 == NULL ) error("Fastq file(s) must be set!");
     
     args.r1_fp = gzopen(args.input_fname1, "r");
@@ -409,7 +409,7 @@ int parse_args(int argc, char **argv)
     args.k1 = kseq_init(args.r1_fp);
     
     if ( args.input_fname2 == NULL ) {
-        args.is_pe = 0;        
+        args.is_pe = 0;
     }
     else {
         args.r2_fp = gzopen(args.input_fname2, "r");
@@ -422,8 +422,13 @@ int parse_args(int argc, char **argv)
         args.r1_out = gzopen(args.output_fname1, "w");
         if (args.r1_out == NULL) error("%s : %s.", args.output_fname1, strerror(errno));
         if ( args.output_fname2 != NULL ) {
-            args.r2_out = gzopen(args.output_fname2, "w");
-            if (args.r2_out == NULL) error("%s : %s.", args.output_fname2, strerror(errno));
+            if ( args.is_pe == 1 ) {
+                args.r2_out = gzopen(args.output_fname2, "w");
+                if (args.r2_out == NULL) error("%s : %s.", args.output_fname2, strerror(errno));
+            }
+            else {
+                warnings("Single end mode, no read 2 output! -2 is disabled.");
+            }
         }
     }
 
@@ -620,7 +625,7 @@ int write_out(struct bseq_pool *p)
             if (b->flag == TRIMMED ) opts->stat.trimmed++;
             kstring_t str1 = {0,0,0};
             kstring_t str2 = {0,0,0};
-            kputc('@', &str1);
+            kputc(b->q0 ? '@' : '>', &str1);
             kputs(b->n0, &str1);            
             kputc('\n', &str1);
             kputsn(b->s0, b->l0, &str1);
@@ -632,7 +637,7 @@ int write_out(struct bseq_pool *p)
                 kputc('\n', &str1);
             }
             if ( opts->is_pe ) {
-                kputc('@', &str2);
+                kputc(b->q1 ? '@' : '>', &str2);
                 kputs(b->n1, &str2);
                 kputc('\n', &str2);
                 kputsn(b->s1, b->l1, &str2);
