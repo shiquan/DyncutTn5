@@ -197,6 +197,8 @@ struct bseq_pool *bseq_read(kseq_t *k1, kseq_t *k2, int chunk_size, int pe)
             s->s0 = strdup(k1->seq.s);
             s->q0 = k1->qual.l? strdup(k1->qual.s) : 0;
             s->l0 = k1->seq.l;
+            s->l1 = 0;
+
             size += s->l0;
             p->n++;
             if ( size >= chunk_size ) break;
