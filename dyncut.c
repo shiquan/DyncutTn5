@@ -53,6 +53,10 @@ struct trimstat {
 // Transposase recognition sequences
 // 19bp Mosaic Ends: CTGTCTCTTATACACATCT
 const char *me = "CTGTCTCTTATACACATCT";
+//                CTGTCTCTTATACACATCTGACGTC
+//AGCGTCAGATGTGTATAAGAGACAG
+
+
 const char *code2seq = "NACNGNNNTNN";
 
 #define MINI_SKIP 1
@@ -570,7 +574,7 @@ void *trim_core(void *_p, int idx)
             struct bseq *b = &p->s[i];
             int l0;
             if (opts->drop_poll) {
-                l0 = find_sequence_adaptor_rev(b->s0, opts->me_or_ada, opts->mismatch, opts->base_tab);
+                l0 = find_sequence_adaptor_rev(b->s0, opts->me_or_ada, opts->mismatch, opts->rev_tab);
                 if (l0 > 0 ) {
                     b->flag = DROP_POLL;
                     continue;
