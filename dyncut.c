@@ -47,7 +47,7 @@ struct trimstat {
     uint64_t all_fragments;
     uint64_t trimmed;
     uint64_t small;
-    uint64_t dropped;
+    uint64_t rev_trimmed;
 };
 
 // Transposase recognition sequences
@@ -61,7 +61,6 @@ const char *code2seq = "NACNGNNNTNN";
 
 #define MINI_SKIP 1
 #define TRIMMED   2
-#define DROP_POLL 3
 
 static int check_name(kstring_t name1, kstring_t name2)
 {
@@ -99,8 +98,8 @@ int usage()
             "  -tail [0]            Trimmed both ends if no adaptor detected.\n"
             "  -adaptor [seq]       Adaptor sequences. Default is 19bp mosaic ends.\n"
             "  -report [report.txt] Export report summary.\n"
-            "  -fail [fails.txt]    Names of droped reads.\n"
-            "  -d                   Drop reads if reversed adaptor detected.\n"
+            // "  -fail [fails.txt]    Names of droped reads.\n"
+            "  -d                   Trim reversed ME sequence.\n"
             "  -t [1]               Threads.\n"
             "\n"
             "Notes:\n"
@@ -261,7 +260,7 @@ struct args {
     int mismatch;
     int tail_3;
     int mini_frag;
-    int drop_poll;    
+    int rev_trimmed;    
     const char *adaptor;
     unsigned char *base_tab;
     unsigned char *rev_tab;
@@ -295,7 +294,7 @@ struct args {
     .mismatch = 1,
     .mini_frag = 18,
     .tail_3 = 0,
-    .drop_poll = 0,
+    .rev_trimmed = 0,
     .adaptor = NULL,
     .base_tab = NULL,
     .k1 = NULL,
@@ -318,8 +317,8 @@ void memory_release()
         fprintf(args.report_fp, "All reads (or pairs): %llu\n", args.stat.all_fragments);
         fprintf(args.report_fp, "Trimmed reads (or pairs): %llu\n", args.stat.trimmed);
         fprintf(args.report_fp, "Fragment smaller than %d: %llu\n", args.mini_frag, args.stat.small);
-        fprintf(args.report_fp, "Dropped polluted reads: %llu\n", args.stat.dropped);
-        fclose(args.report_fp);    
+        fprintf(args.report_fp, "Reverse adaptor trimmed reads: %llu\n", args.stat.rev_trimmed);
+        fclose(args.report_fp);
     }
                 
     if ( args.fail_fp ) fclose(args.fail_fp);
@@ -370,7 +369,7 @@ int parse_args(int argc, char **argv)
         else if ( strcmp(a, "-tail") == 0 ) var = &t3;        
         // else if ( strcmp(a, "-s") == 0 ) var = &args.se_fname;
         else if ( strcmp(a, "-d") == 0 ) {
-            args.drop_poll = 1;
+            args.rev_trimmed = 1;
             continue;
         }
 
@@ -503,28 +502,13 @@ int find_sequence_adaptor_rev(const char *s, const struct encode *a, int m, unsi
     }
     return -1;
 }
-void *trim_core(void *_p, int idx)
+void trim_3end(struct args *opts, struct bseq_pool *p)
 {
     int i;
-    struct bseq_pool *p = (struct bseq_pool*)_p;
-    struct args *opts = p->opts;
     if ( opts->is_pe ) {
         for ( i = 0; i < p->n; ++i ) {
             struct bseq *b = &p->s[i];
             int l0, l1;
-            if (opts->drop_poll) {
-                l0 = find_sequence_adaptor_rev(b->s0, opts->me_or_ada, opts->mismatch, opts->rev_tab);
-                if (l0 > 0 ) {
-                    b->flag = DROP_POLL;
-                    continue;
-                }
-                    
-                l1 = find_sequence_adaptor_rev(b->s1, opts->me_or_ada, opts->mismatch, opts->rev_tab);
-                if (l1 > 0 ) {
-                    b->flag = DROP_POLL;
-                    continue;
-                }
-            }
                             
             l0 = find_sequence_adaptor(b->s0, opts->me_or_ada, opts->mismatch, opts->base_tab);
             l1 = find_sequence_adaptor(b->s1, opts->me_or_ada, opts->mismatch, opts->base_tab);
@@ -538,22 +522,23 @@ void *trim_core(void *_p, int idx)
                     b->l0 -= opts->tail_3;
                     if ( b->l1 < args.mini_frag ) b->flag = MINI_SKIP;
                 }
-                continue;
+                // continue;
             }
             
             // consider PE reads are not same length, treat as SEs??
 
             // ME found
-            if ( l0 == l1 ) {
+            else if ( l0 == l1 ) {
                 b->l0 = l0;
                 b->l1 = l1;
                 if ( b->l1 < args.mini_frag ) b->flag = MINI_SKIP;
                 else b->flag = TRIMMED;
-                continue;
+                // continue;
             }
 
             // Inconsistant, trim as many as possible
-            if ( l0 != l1 ) {
+            else if ( l0 != l1 ) {
+                /*
                 if (l0 > 0 && l1 > 0) {
                     b->l0 = l0 > l1 && l1 > 0 ? l1 : l0;
                     b->l1 = l1 > l0 && l0 > 0 ? l0 : l1;
@@ -563,24 +548,20 @@ void *trim_core(void *_p, int idx)
                 else {
                     b->l0 = l0 > 0 ? l0 : b->l0;
                     b->l1 = l1 > 0 ? l1 : b->l1;
-                    if ( opts->drop_poll ) b->flag = DROP_POLL;
+                    // if ( opts->rev_trimmed ) b->flag = REV;
                 }
-                continue;
+                // continue;
+                */
+                b->l0 = l0;
+                b->l1 = l1;
             }
+            
         }
     }
-    else {
+    else { // Single end
         for ( i = 0; i < p->n; ++i ) {
             struct bseq *b = &p->s[i];
             int l0;
-            if (opts->drop_poll) {
-                l0 = find_sequence_adaptor_rev(b->s0, opts->me_or_ada, opts->mismatch, opts->rev_tab);
-                if (l0 > 0 ) {
-                    b->flag = DROP_POLL;
-                    continue;
-                }
-            }
-
             l0 = find_sequence_adaptor(b->s0, opts->me_or_ada, opts->mismatch, opts->base_tab);
 
             if ( b->l0 - l0 < 5) l0 = -1;
@@ -590,7 +571,7 @@ void *trim_core(void *_p, int idx)
                     b->l0 -= opts->tail_3;
                     if ( b->l0 < args.mini_frag ) b->flag = MINI_SKIP;
                 }
-                continue;
+                // continue;
             }
             else {
                 b->l0 = l0;
@@ -599,6 +580,50 @@ void *trim_core(void *_p, int idx)
             }
         }
     }
+
+}
+void trim_5end(struct args *opts, struct bseq_pool *p)
+{
+    int l0, l1;
+    int i;
+    if (opts->rev_trimmed) {
+        for ( i = 0; i < p->n; ++i ) {
+            struct bseq *b = &p->s[i];
+
+            if (opts->is_pe) {
+                l0 = find_sequence_adaptor_rev(b->s0, opts->me_or_ada, opts->mismatch, opts->rev_tab);
+                if (l0 > 0 ) {
+                    b->l0 -= l0;
+                    memmove(b->s0, b->s0 + l0, b->l0);
+                    b->flag = TRIMMED;
+                }
+                    
+                l1 = find_sequence_adaptor_rev(b->s1, opts->me_or_ada, opts->mismatch, opts->rev_tab);
+                if (l1 > 0 ) {
+                    b->l1 -= l1;
+                    memmove(b->s1, b->s1 + l1, b->l1);
+                    b->flag = TRIMMED;
+                }
+            }
+            else {
+                l0 = find_sequence_adaptor_rev(b->s0, opts->me_or_ada, opts->mismatch, opts->rev_tab);
+                if (l0 > 0 ) { 
+                    b->l0 -= l0;
+                    memmove(b->s0, b->s0 + l0, b->l0);
+                    b->flag = TRIMMED;
+                }
+            }
+        }
+    }
+}
+void *trim_core(void *_p, int idx)
+{
+    int i;
+    struct bseq_pool *p = (struct bseq_pool*)_p;
+    struct args *opts = p->opts;
+    trim_3end(opts, p);
+    trim_5end(opts, p);
+    
     return p;
 }
 int write_out(struct bseq_pool *p)
@@ -621,11 +646,12 @@ int write_out(struct bseq_pool *p)
         opts->stat.all_fragments++;
         if ( b->flag == MINI_SKIP ) {
             opts->stat.small++;
-            if (opts->fail_fp) fprintf(opts->fail_fp, "%s\n", b->n0);
+/*            if (opts->fail_fp) fprintf(opts->fail_fp, "%s\n", b->n0);
         }
         else if (b->flag == DROP_POLL ) {
             opts->stat.dropped++;
             if (opts->fail_fp) fprintf(opts->fail_fp, "%s\n", b->n0);
+*/
         }
         else {
             if (b->flag == TRIMMED ) opts->stat.trimmed++;
