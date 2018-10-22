@@ -47,16 +47,15 @@ struct trimstat {
     uint64_t all_fragments;
     uint64_t trimmed;
     uint64_t small;
-    uint64_t rev_trimmed;
+    // uint64_t rev_trimmed;
 };
 
 // Transposase recognition sequences
 // 19bp Mosaic Ends: CTGTCTCTTATACACATCT
-const char *me = "CTGTCTCTTATACACATCT";
-//                CTGTCTCTTATACACATCTGACGTC
-//AGCGTCAGATGTGTATAAGAGACAG
-
-
+const char *me = "CTGTCTCTTATACACATCTGACGTC";
+//                    CTGTCTCTTATACACATCTGACGTC
+const char *rev_me = "TGTGTATAAGAGACAG";
+// AGCGTCAGATGTGTATAAGAGACAG
 const char *code2seq = "NACNGNNNTNN";
 
 #define MINI_SKIP 1
@@ -123,10 +122,16 @@ struct encode {
 struct encode *revcode(struct encode *c)
 {
     struct encode *r = malloc(sizeof(*r));
+    uint8_t x[9];
+    memset(x, 0, 9);
+    x[1] = 8;
+    x[2] = 4;
+    x[4] = 2;
+    x[8] = 1;
     r->l = c->l;
     r->x = 0;
     int i;
-    for ( i =0; i < c->l; ++i ) r->x = r->x | ((c->x>>i)&0x1)<<(c->l-i-1);
+    for ( i = c->l-1; i >= 0; --i ) r->x = (r->x<<4) | x[(c->x>>(i*4))&0xf];
     return r;
 };
 struct encode *str_encode(const char *s, unsigned char *tab)
@@ -309,7 +314,7 @@ struct args {
     .revada =NULL,
     .chunk_size = 10000000,
     .is_pe = 0,
-    .stat = {0,0,0,0},
+    .stat = {0,0,0},
 };
 void memory_release()
 {
@@ -317,7 +322,7 @@ void memory_release()
         fprintf(args.report_fp, "All reads (or pairs): %llu\n", args.stat.all_fragments);
         fprintf(args.report_fp, "Trimmed reads (or pairs): %llu\n", args.stat.trimmed);
         fprintf(args.report_fp, "Fragment smaller than %d: %llu\n", args.mini_frag, args.stat.small);
-        fprintf(args.report_fp, "Reverse adaptor trimmed reads: %llu\n", args.stat.rev_trimmed);
+        //fprintf(args.report_fp, "Reverse adaptor trimmed reads: %llu\n", args.stat.rev_trimmed);
         fclose(args.report_fp);
     }
                 
@@ -403,8 +408,8 @@ int parse_args(int argc, char **argv)
     args.rev_tab = base_tab_rev_init();
     
     args.me_or_ada = args.adaptor == NULL ? str_encode(me, args.base_tab) : str_encode(args.adaptor, args.base_tab);
-    args.revada = revcode(args.me_or_ada);
-    
+    args.revada = str_encode(rev_me, args.base_tab);
+
     if ( args.input_fname1 == NULL && (!isatty(fileno(stdin))) )
         args.input_fname1 = "-";    
     if ( args.input_fname1 == NULL ) error("Fastq file(s) must be set!");
@@ -475,13 +480,19 @@ int find_sequence_adaptor(const char *s, const struct encode *a, int m, unsigned
     }
     return -1;
 }
-int find_sequence_adaptor_rev(const char *s, const struct encode *a, int m, unsigned char const *tab)
+int find_sequence_adaptor_rev(const char *s, int l, const struct encode *a, int m, unsigned char const *tab)
 {
-    int l, n = 0;
+    int n = 0;
     int i;
-    l = strlen(s);    
+    // l = strlen(s);    
     uint64_t x = 0;
-    //uint64_t mask = 0xFFFFFFFFFFFFFFFF;
+    for ( i = 0; i < l; ++i ) {
+        x = x<<4|(tab[s[i]]&0xf);        
+        if (++n >= a->l) {
+            if ( x== a->x || countbits(x&a->x) >= a->l -m) return i+1;
+        }
+    }
+/*
     for ( i = 0; i < l; ++i) {
         x = x<<4|(tab[s[l-i-1]]&0xf);
         //debug_print("%d\t%d\t%d\t%d\t%d", n, a->l, countbits(x&a->x), a->l -m, i);
@@ -500,6 +511,7 @@ int find_sequence_adaptor_rev(const char *s, const struct encode *a, int m, unsi
 
         if (countbits(x&x1)>= l1 -mis ) return l - a->l + i;
     }
+    */
     return -1;
 }
 void trim_3end(struct args *opts, struct bseq_pool *p)
@@ -545,15 +557,9 @@ void trim_3end(struct args *opts, struct bseq_pool *p)
                     if ( b->l1 < args.mini_frag ) b->flag = MINI_SKIP;
                     else b->flag = TRIMMED;
                 }
-                else {
-                    b->l0 = l0 > 0 ? l0 : b->l0;
-                    b->l1 = l1 > 0 ? l1 : b->l1;
-                    // if ( opts->rev_trimmed ) b->flag = REV;
-                }
-                // continue;
                 */
-                b->l0 = l0;
-                b->l1 = l1;
+                b->l0 = l0 > 0 ? l0 : b->l0;
+                b->l1 = l1 > 0 ? l1 : b->l1;
             }
             
         }
@@ -591,14 +597,16 @@ void trim_5end(struct args *opts, struct bseq_pool *p)
             struct bseq *b = &p->s[i];
 
             if (opts->is_pe) {
-                l0 = find_sequence_adaptor_rev(b->s0, opts->me_or_ada, opts->mismatch, opts->rev_tab);
+                l0 = find_sequence_adaptor_rev(b->s0, b->l0, opts->revada, opts->mismatch, opts->base_tab);
                 if (l0 > 0 ) {
+                    debug_print("%d",l0);
                     b->l0 -= l0;
                     memmove(b->s0, b->s0 + l0, b->l0);
+                    debug_print("%s",b->s0);
                     b->flag = TRIMMED;
                 }
                     
-                l1 = find_sequence_adaptor_rev(b->s1, opts->me_or_ada, opts->mismatch, opts->rev_tab);
+                l1 = find_sequence_adaptor_rev(b->s1, b->l1, opts->revada, opts->mismatch, opts->base_tab);
                 if (l1 > 0 ) {
                     b->l1 -= l1;
                     memmove(b->s1, b->s1 + l1, b->l1);
@@ -606,7 +614,7 @@ void trim_5end(struct args *opts, struct bseq_pool *p)
                 }
             }
             else {
-                l0 = find_sequence_adaptor_rev(b->s0, opts->me_or_ada, opts->mismatch, opts->rev_tab);
+                l0 = find_sequence_adaptor_rev(b->s0, b->l0, opts->revada, opts->mismatch, opts->base_tab);
                 if (l0 > 0 ) { 
                     b->l0 -= l0;
                     memmove(b->s0, b->s0 + l0, b->l0);
