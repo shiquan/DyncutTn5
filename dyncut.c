@@ -61,14 +61,14 @@ const char *code2seq = "NACNGNNNTNN";
 #define MINI_SKIP 1
 #define TRIMMED   2
 
-static int check_name(kstring_t name1, kstring_t name2)
+static int check_name(char *s1, char *s2)
 {
-    char *s1 = name1.s;
-    char *s2 = name2.s;
-    // int l;
-    // if ( name1.s[name1.l-2] == '/' ) l = name1.l-2;
+    int l1 = strlen(s1);
+    int l2 = strlen(s2);
+    if ( l1 != l2 ) return 1;
+
     size_t n;
-    for(n = 0; n < name1.l - 1; ++n, ++s1, ++s2) {
+    for(n = 0; n < l1 - 1; ++n, ++s1, ++s2) {
         if (*s1 != *s2) return 1;
     }
     return 0;
@@ -98,7 +98,7 @@ int usage()
             "  -report [report.txt] Export report summary.\n"
             "  -d                   Trim reversed ME sequence.\n"
             "  -t [1]               Threads.\n"
-            "  -parse               *experimental* Parse barcode sequence, for our in house pipeline only.\n"
+            "  -p                   Smart pairing.\n"
             "\n"
             "Notes:\n"
             "The program is designed to trim TN5 transposase introduced mosaic ends and\n"
@@ -187,6 +187,42 @@ void bseq_pool_destroy(struct bseq_pool *p)
     if (p->m > 0) free(p->s);
     free(p);
 }
+struct bseq_pool *bseq_read_smart(kseq_t *ks, int chunk_size)
+{
+    struct bseq_pool *p = bseq_pool_init();
+    int size = 0;
+    do {
+        if ( kseq_read(ks) < 0 ) break;
+        struct bseq *s;
+        if (p->n >= p->m ) {
+            p->m = p->m ? p->m*2 : 256;
+            p->s = realloc(p->s, p->m*sizeof(struct bseq));
+        }
+        s = &p->s[p->n];
+        s->n0 = strdup(ks->name.s);
+        s->s0 = strdup(ks->seq.s);
+        s->q0 = ks->qual.l? strdup(ks->qual.s) : 0;
+        s->l0 = ks->seq.l;
+        size += s->l0;
+        if ( kseq_read(ks) < 0 ) error("Truncated input.");
+
+        s->n1 = strdup(ks->name.s);
+        if ( check_name(s->n0, s->n1) ) error("Inconsistance paired read names. %s vs %s.", s->n0, s->n1);
+        s->s1 = strdup(ks->seq.s);
+        s->q1 = ks->qual.l? strdup(ks->qual.s) : 0;
+        s->l1 = ks->seq.l;
+        size += s->l1;
+        p->n++;
+        
+        if ( size >= chunk_size ) break;
+    }
+    while (1);
+    if ( p->n == 0 ) {
+        bseq_pool_destroy(p);
+        return NULL;
+    }
+    return p;
+}
 struct bseq_pool *bseq_read(kseq_t *k1, kseq_t *k2, int chunk_size, int pe)
 {
     struct bseq_pool *p = bseq_pool_init();
@@ -217,7 +253,7 @@ struct bseq_pool *bseq_read(kseq_t *k1, kseq_t *k2, int chunk_size, int pe)
             if ( kseq_read(k1) < 0 ) break;
             if ( kseq_read(k2) < 0 ) break;
             
-            if ( check_name(k1->name, k2->name) ) error("Inconsistance paired read names. %s vs %s.", k1->name.s, k2->name.s);
+            if ( check_name(k1->name.s, k2->name.s) ) error("Inconsistance paired read names. %s vs %s.", k1->name.s, k2->name.s);
             //if ( k1->seq.l != k2->seq.l ) error("Inconsistant PE read length, %s.", k1->name.s);
             
             struct bseq *s;
@@ -250,11 +286,6 @@ struct bseq_pool *bseq_read(kseq_t *k1, kseq_t *k2, int chunk_size, int pe)
     return p;
 }
 
-void parse_barcode_droplet(struct bseq_pool *p)
-{
-    void;
-    
-}
 struct args {
     const char *input_fname1;
     const char *input_fname2;
@@ -263,7 +294,8 @@ struct args {
     const char *report_fname;
     const char *fail_fname;
     const char *se_fname;
-    
+
+    int smart_pairing;
     int n_thread;
     int se_mode;
     int mismatch;
@@ -297,7 +329,8 @@ struct args {
     .report_fname = NULL,
     .fail_fname = NULL,
     .se_fname = NULL,
-    
+
+    .smart_pairing = 0,
     .n_thread = 1,
     .se_mode = 0,
     .mismatch = 1,
@@ -379,6 +412,10 @@ int parse_args(int argc, char **argv)
         // else if ( strcmp(a, "-s") == 0 ) var = &args.se_fname;
         else if ( strcmp(a, "-d") == 0 ) {
             args.rev_trimmed = 1;
+            continue;
+        }
+        else if ( strcmp(a, "-p") == 0 ) {
+            args.smart_pairing = 1;
             continue;
         }
 
@@ -649,8 +686,14 @@ int write_out(struct bseq_pool *p)
         else mode = 3;
     }
     else {
-        if (opts->r1_out == NULL ) mode = 4;
-        else mode = 5;
+        if ( opts->smart_pairing ==1 ) {
+            if ( opts->r1_out == NULL ) mode = 3;
+            else mode = 2;  
+        }
+        else {
+            if (opts->r1_out == NULL ) mode = 4;
+            else mode = 5;
+        }
     }
          
     for ( i = 0; i < p->n; ++i ) {
@@ -680,7 +723,7 @@ int write_out(struct bseq_pool *p)
                 kputsn(b->q0, b->l0, &str1);
                 kputc('\n', &str1);
             }
-            if ( opts->is_pe ) {
+            if (b->l1>0) {
                 kputc(b->q1 ? '@' : '>', &str2);
                 kputs(b->n1, &str2);
                 kputc('\n', &str2);
@@ -721,7 +764,7 @@ int write_out(struct bseq_pool *p)
 int trim_adap_light()
 {
     do {
-        struct bseq_pool *p = bseq_read(args.k1, args.k2, args.chunk_size, args.is_pe);
+        struct bseq_pool *p = args.smart_pairing == 1 ? bseq_read_smart(args.k1, args.chunk_size) : bseq_read(args.k1, args.k2, args.chunk_size, args.is_pe);
         if (p == NULL) break;
         int idx;
         p->opts = &args;
@@ -745,7 +788,7 @@ int main(int argc, char **argv)
         struct thread_pool_result *r;
 
         for (;;) {
-            struct bseq_pool *b = bseq_read(args.k1, args.k2, args.chunk_size, args.is_pe);
+            struct bseq_pool *b = args.smart_pairing == 1 ? bseq_read_smart(args.k1, args.chunk_size) : bseq_read(args.k1, args.k2, args.chunk_size, args.is_pe);
             if (b == NULL) break;
             b->opts = &args;
             int block;
