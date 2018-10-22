@@ -91,15 +91,14 @@ int usage()
             "Options:\n"
             "  -1 [output1.fq.gz]   Output fastq 1 file or smart pairing file (ignore fastq 2).\n"
             "  -2 [output2.fq.gz]   Output fastq 2 file.\n"
-            //"  -S                   Trim PE reads in SE mode.\n"
             "  -m [1]               Allowed mismatches on the adaptor.\n"            
             "  -l [20]              Minimal fragment to keep.\n"
             "  -tail [0]            Trimmed both ends if no adaptor detected.\n"
             "  -adaptor [seq]       Adaptor sequences. Default is 19bp mosaic ends.\n"
             "  -report [report.txt] Export report summary.\n"
-            // "  -fail [fails.txt]    Names of droped reads.\n"
             "  -d                   Trim reversed ME sequence.\n"
             "  -t [1]               Threads.\n"
+            "  -parse               *experimental* Parse barcode sequence, for our in house pipeline only.\n"
             "\n"
             "Notes:\n"
             "The program is designed to trim TN5 transposase introduced mosaic ends and\n"
@@ -251,6 +250,11 @@ struct bseq_pool *bseq_read(kseq_t *k1, kseq_t *k2, int chunk_size, int pe)
     return p;
 }
 
+void parse_barcode_droplet(struct bseq_pool *p)
+{
+    void;
+    
+}
 struct args {
     const char *input_fname1;
     const char *input_fname2;
@@ -599,10 +603,10 @@ void trim_5end(struct args *opts, struct bseq_pool *p)
             if (opts->is_pe) {
                 l0 = find_sequence_adaptor_rev(b->s0, b->l0, opts->revada, opts->mismatch, opts->base_tab);
                 if (l0 > 0 ) {
-                    debug_print("%d",l0);
+                    //debug_print("%d",l0);
                     b->l0 -= l0;
                     memmove(b->s0, b->s0 + l0, b->l0);
-                    debug_print("%s",b->s0);
+                    //debug_print("%s",b->s0);
                     b->flag = TRIMMED;
                 }
                     
