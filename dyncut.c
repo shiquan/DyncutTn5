@@ -170,7 +170,7 @@ struct bseq_pool *bseq_pool_init()
     memset(p, 0, sizeof(*p));
     return p;
 }
-void bseq_pool_destroy(struct bseq_pool *p)
+void bseq_pool_clean(struct bseq_pool *p)
 {
     int i;
     for ( i = 0; i < p->n; ++i ) {
@@ -187,6 +187,10 @@ void bseq_pool_destroy(struct bseq_pool *p)
         }
     }
     if (p->m > 0) free(p->s);
+}
+void bseq_pool_destroy(struct bseq_pool *p)
+{
+    bseq_pool_clean(p);
     free(p);
 }
 struct bseq_pool *bseq_read_smart(kseq_t *ks, int chunk_size)
@@ -749,7 +753,7 @@ int write_out(struct bseq_pool *p)
         }
     }
 
-    bseq_pool_destroy(p);
+    bseq_pool_clean(p);
     
     return 0;
 }
@@ -762,6 +766,7 @@ int trim_adap_light()
         p->opts = &args;
         trim_core(p, idx);
         write_out(p);
+        free(p);
     }
     while(1);
     return 0;
