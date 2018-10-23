@@ -47,6 +47,7 @@ struct trimstat {
     uint64_t all_fragments;
     uint64_t trimmed;
     uint64_t small;
+    uint64_t dropped;
     // uint64_t rev_trimmed;
 };
 
@@ -60,6 +61,7 @@ const char *code2seq = "NACNGNNNTNN";
 
 #define MINI_SKIP 1
 #define TRIMMED   2
+#define DROP_POLL 3
 
 static int check_name(char *s1, char *s2)
 {
@@ -96,7 +98,7 @@ int usage()
             "  -tail [0]            Trimmed both ends if no adaptor detected.\n"
             "  -adaptor [seq]       Adaptor sequences. Default is 19bp mosaic ends.\n"
             "  -report [report.txt] Export report summary.\n"
-            "  -d                   Trim reversed ME sequence.\n"
+            "  -d                   Drop if reversed ME sequence detected.\n"
             "  -t [1]               Threads.\n"
             "  -p                   Smart pairing.\n"
             "\n"
@@ -528,7 +530,7 @@ int find_sequence_adaptor_rev(const char *s, int l, const struct encode *a, int 
     // l = strlen(s);    
     uint64_t x = 0;
     for ( i = 0; i < l; ++i ) {
-        x = x<<4|(tab[s[i]]&0xf);        
+        x = x<<4|(tab[s[i]]&0xf);
         if (++n >= a->l) {
             if ( x== a->x || countbits(x&a->x) >= a->l -m) return i+1;
         }
@@ -641,7 +643,7 @@ void trim_5end(struct args *opts, struct bseq_pool *p)
             if (l0 > 0 ) {
                 b->l0 -= l0;
                 memmove(b->s0, b->s0 + l0, b->l0);
-                b->flag = TRIMMED;
+                b->flag = DROP_POLL;
             }
 
             if ( b->l1 > 0 ) {
@@ -649,7 +651,7 @@ void trim_5end(struct args *opts, struct bseq_pool *p)
                 if (l1 > 0 ) {
                     b->l1 -= l1;
                     memmove(b->s1, b->s1 + l1, b->l1);
-                    b->flag = TRIMMED;
+                    b->flag = DROP_POLL;
                 }
             }
 
@@ -692,12 +694,12 @@ int write_out(struct bseq_pool *p)
         opts->stat.all_fragments++;
         if ( b->flag == MINI_SKIP ) {
             opts->stat.small++;
-/*            if (opts->fail_fp) fprintf(opts->fail_fp, "%s\n", b->n0);
+//            if (opts->fail_fp) fprintf(opts->fail_fp, "%s\n", b->n0);
         }
         else if (b->flag == DROP_POLL ) {
             opts->stat.dropped++;
-            if (opts->fail_fp) fprintf(opts->fail_fp, "%s\n", b->n0);
-*/
+            //if (opts->fail_fp) fprintf(opts->fail_fp, "%s\n", b->n0);
+//
         }
         else {
             if (b->flag == TRIMMED ) opts->stat.trimmed++;
