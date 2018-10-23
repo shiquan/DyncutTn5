@@ -222,7 +222,7 @@ struct bseq_pool *bseq_read_smart(kseq_t *ks, int chunk_size)
     if ( p->n == 0 ) {
         bseq_pool_destroy(p);
         return NULL;
-    }
+   }
     return p;
 }
 struct bseq_pool *bseq_read(kseq_t *k1, kseq_t *k2, int chunk_size, int pe)
@@ -594,16 +594,13 @@ void trim_3end(struct args *opts, struct bseq_pool *p)
 
             // Inconsistant, trim as many as possible
             else if ( l0 != l1 ) {
-                /*
+                // equal length
                 if (l0 > 0 && l1 > 0) {
                     b->l0 = l0 > l1 && l1 > 0 ? l1 : l0;
                     b->l1 = l1 > l0 && l0 > 0 ? l0 : l1;
                     if ( b->l1 < args.mini_frag ) b->flag = MINI_SKIP;
                     else b->flag = TRIMMED;
                 }
-                */
-                b->l0 = l0 > 0 ? l0 : b->l0;
-                b->l1 = l1 > 0 ? l1 : b->l1;
             }
             
         }
@@ -636,22 +633,21 @@ void trim_5end(struct args *opts, struct bseq_pool *p)
 {
     int l0, l1;
     int i;
-    if (opts->rev_trimmed) {
+    if (opts->rev_trimmed) { // drop all reversed adaptor polluation instead of trim
         for ( i = 0; i < p->n; ++i ) {
             struct bseq *b = &p->s[i];
 
             l0 = find_sequence_adaptor_rev(b->s0, b->l0, opts->revada, opts->mismatch, opts->base_tab);
             if (l0 > 0 ) {
-                b->l0 -= l0;
-                memmove(b->s0, b->s0 + l0, b->l0);
+                //b->l0 -= l0;
+                //memmove(b->s0, b->s0 + l0, b->l0);
                 b->flag = DROP_POLL;
             }
-
-            if ( b->l1 > 0 ) {
+            else if ( b->l1 > 0 ) {
                 l1 = find_sequence_adaptor_rev(b->s1, b->l1, opts->revada, opts->mismatch, opts->base_tab);
                 if (l1 > 0 ) {
-                    b->l1 -= l1;
-                    memmove(b->s1, b->s1 + l1, b->l1);
+                    //b->l1 -= l1;
+                    //memmove(b->s1, b->s1 + l1, b->l1);
                     b->flag = DROP_POLL;
                 }
             }
@@ -693,17 +689,16 @@ int write_out(struct bseq_pool *p)
     for ( i = 0; i < p->n; ++i ) {
         struct bseq *b = &p->s[i];
         opts->stat.all_fragments++;
+
         if ( b->flag == MINI_SKIP ) {
             opts->stat.small++;
-//            if (opts->fail_fp) fprintf(opts->fail_fp, "%s\n", b->n0);
         }
         else if (b->flag == DROP_POLL ) {
             opts->stat.dropped++;
-            //if (opts->fail_fp) fprintf(opts->fail_fp, "%s\n", b->n0);
-//
         }
         else {
             if (b->flag == TRIMMED ) opts->stat.trimmed++;
+            
             kstring_t str1 = {0,0,0};
             kstring_t str2 = {0,0,0};
             kputc(b->q0 ? '@' : '>', &str1);
