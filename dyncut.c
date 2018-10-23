@@ -365,10 +365,11 @@ void memory_release()
         fclose(args.report_fp);
     }
                 
-    if ( args.fail_fp ) fclose(args.fail_fp);
+    // if ( args.fail_fp ) fclose(args.fail_fp);
     free(args.base_tab);
     free(args.rev_tab);
     free(args.me_or_ada);
+    free(args.revada);
     if ( args.k1 ) {
         kseq_destroy(args.k1);
         gzclose(args.r1_fp);
@@ -754,6 +755,7 @@ int write_out(struct bseq_pool *p)
     }
 
     bseq_pool_destroy(p);
+    
     return 0;
 }
 int trim_adap_light()
