@@ -790,6 +790,7 @@ int main(int argc, char **argv)
                 if ((r = thread_pool_next_result(q))) {
                     struct bseq_pool *d = (struct bseq_pool*)r->data;
                     write_out(d);
+                    bseq_pool_destroy(d);
                 }
                 thread_pool_delete_result(r,1);
             }
