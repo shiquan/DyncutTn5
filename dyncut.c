@@ -752,6 +752,8 @@ int write_out(struct bseq_pool *p)
             if (str2.m) free(str2.s);        
         }
     }
+
+    bseq_pool_destroy(p);
     return 0;
 }
 int trim_adap_light()
@@ -763,7 +765,6 @@ int trim_adap_light()
         p->opts = &args;
         trim_core(p, idx);
         write_out(p);
-        bseq_pool_destroy(p);
     }
     while(1);
     return 0;
@@ -790,7 +791,6 @@ int main(int argc, char **argv)
                 if ((r = thread_pool_next_result(q))) {
                     struct bseq_pool *d = (struct bseq_pool*)r->data;
                     write_out(d);
-                    bseq_pool_destroy(d);
                 }
                 thread_pool_delete_result(r,1);
             }
