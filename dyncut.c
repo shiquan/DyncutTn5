@@ -637,16 +637,14 @@ void trim_5end(struct args *opts, struct bseq_pool *p)
         for ( i = 0; i < p->n; ++i ) {
             struct bseq *b = &p->s[i];
 
-            if (opts->is_pe) {
-                l0 = find_sequence_adaptor_rev(b->s0, b->l0, opts->revada, opts->mismatch, opts->base_tab);
-                if (l0 > 0 ) {
-                    //debug_print("%d",l0);
-                    b->l0 -= l0;
-                    memmove(b->s0, b->s0 + l0, b->l0);
-                    //debug_print("%s",b->s0);
-                    b->flag = TRIMMED;
-                }
-                    
+            l0 = find_sequence_adaptor_rev(b->s0, b->l0, opts->revada, opts->mismatch, opts->base_tab);
+            if (l0 > 0 ) {
+                b->l0 -= l0;
+                memmove(b->s0, b->s0 + l0, b->l0);
+                b->flag = TRIMMED;
+            }
+
+            if ( b->l1 > 0 ) {
                 l1 = find_sequence_adaptor_rev(b->s1, b->l1, opts->revada, opts->mismatch, opts->base_tab);
                 if (l1 > 0 ) {
                     b->l1 -= l1;
@@ -654,14 +652,7 @@ void trim_5end(struct args *opts, struct bseq_pool *p)
                     b->flag = TRIMMED;
                 }
             }
-            else {
-                l0 = find_sequence_adaptor_rev(b->s0, b->l0, opts->revada, opts->mismatch, opts->base_tab);
-                if (l0 > 0 ) { 
-                    b->l0 -= l0;
-                    memmove(b->s0, b->s0 + l0, b->l0);
-                    b->flag = TRIMMED;
-                }
-            }
+
         }
     }
 }
