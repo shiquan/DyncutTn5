@@ -1,8 +1,8 @@
-#include "shilib/utils.h"
-#include "shilib/number.h"
-#include "htslib/kseq.h"
-#include "htslib/kstring.h"
-#include "shilib/thread_pool.h"
+#include "utils.h"
+#include "number.h"
+#include "kseq.h"
+#include "kstring.h"
+#include "thread_pool.h"
 #include "fastq.h"
 
 static char * program_name =  "Dyncut";
@@ -195,7 +195,7 @@ struct args {
     
     .smart_pair = 0,
     .n_thread = 1,
-    .no_parse_flag = 0,
+    //.no_parse_flag = 0,
     
     .skip_flag = 0,
     .se_mode = 0,
@@ -209,7 +209,7 @@ struct args {
     .fail_fp = NULL,
 
     .order_output = 0,
-    .mutex = PTHREAD_MUTEX_INITIALIZER;
+    .mutex = PTHREAD_MUTEX_INITIALIZER,
     .r1_out = NULL,
     .r2_out = NULL,
     
@@ -517,18 +517,13 @@ void write_out(void *_data)
     bseq_pool_destroy(p);
 }
 
-void *parse_Tn5me_adaptor(void *_p, int idx)
+void *run_it(void *_p, int idx)
 {
     int i;
     struct bseq_pool *p = (struct bseq_pool*)_p;
     struct args *opts = p->opts;
     trim_3end(opts, p);
     trim_5end(opts, p);
-
-    if (args.order_output == 0) {
-        pthread_mutex_lock(&opts->mutex);
-        
-    }
     return p;
 }
 
@@ -541,6 +536,44 @@ int main(int argc, char **argv)
 
     void *opts = &args;
     
+
+    int nt = args.n_thread;
+    
+    struct thread_pool *p = thread_pool_init(nt);
+    struct thread_pool_process *q = thread_pool_process_init(p, nt*2, 0);
+    struct thread_pool_result *r;
+
+    for (;;) {
+        struct bseq_pool *b = bseq_read(args.fastq, &args);
+        if (b == NULL) break;
+        int block;
+        do {
+            block = thread_pool_dispatch2(p, q, run_it, b, 0);
+            if ((r = thread_pool_next_result(q))) {
+                struct bseq_pool *d = (struct bseq_pool *)r->data;
+                struct args *opts = d->opts;
+                pthread_mutex_lock(&opts->mutex);
+                write_out(d);
+                pthread_mutex_unlock(&opts->mutex);
+            }
+            thread_pool_delete_result(r, 0);
+        }
+        while (block == -1);
+    }
+    thread_pool_process_flush(q);
+
+    while ((r = thread_pool_next_result(q))) {
+        struct bseq_pool *d = (struct bseq_pool*)r->data;
+        struct args *opts = d->opts;
+        pthread_mutex_lock(&opts->mutex);
+        write_out(d);
+        pthread_mutex_unlock(&opts->mutex);
+        thread_pool_delete_result(r, 0);
+    }
+
+    thread_pool_process_destroy(q);
+    thread_pool_destroy(p);
+
     // multi_threads_workflow(parse_Tn5me_adaptor, write_out, (void*)args.fastq, bseq_read, opts, 0, args.n_thread);
     
     memory_release();
