@@ -1,7 +1,7 @@
 #include "fastq.h"
 #include "number.h"
-#include "htslib/kseq.h"
-#include "htslib/kstring.h"
+#include "kseq.h"
+#include "kstring.h"
 #include <zlib.h>
 
 KSEQ_INIT(gzFile, gzread)

@@ -1,3 +1,6 @@
+#ifndef FASTQ_H
+#define FASTQ_H
+
 #include "utils.h"
 #include<zlib.h>
 
@@ -61,3 +64,6 @@ extern struct fastq_handler *fastq_handler_init(const char *r1, const char *r2, 
 extern int fastq_handler_state(struct fastq_handler*);
 
 extern void fastq_handler_destory(struct fastq_handler *h);
+
+
+#endif
