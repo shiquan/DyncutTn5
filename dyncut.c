@@ -5,6 +5,9 @@
 #include "thread_pool.h"
 #include "fastq.h"
 
+#define TRIMME    0
+#define TRIMPLOYA 1
+
 static char * program_name =  "Dyncut";
 
 static char *version = "0.0.0.9003";
@@ -61,6 +64,9 @@ struct trimstat {
 const char *me = "CTGTCTCTTATACACATCTGACGTC";
 //                    CTGTCTCTTATACACATCTGACGTC
 const char *rev_me = "TGTGTATAAGAGACAG";
+const char *ployA = "AAAAAAAAAAAAAAAAA";
+const char *ployT = "TTTTTTTTTTTTTTTTT";
+
 // AGCGTCAGATGTGTATAAGAGACAG
 const char *code2seq = "NACNGNNNTNN";
 
@@ -88,7 +94,7 @@ int usage()
     fprintf(stderr,"  -t [1]               Threads.\n");
     fprintf(stderr,"  -r [10000000]        Records cached per chunk.\n");
     fprintf(stderr,"  -p                   Smart pairing.\n");
-    fprintf(stderr,"  -mode                Trim mode, ME for mosic ends, ployA for ployA tails.[ME|ployA]\n");
+    fprintf(stderr,"  -mode                Trim mode, Tn5 for mosic ends, ployA for ployA tails.[Tn5|ployA]\n");
     fprintf(stderr,"  -l [20]              Minimal fragment to keep.\n");
     fprintf(stderr,"  -m [1]               Allowed mismatches.\n");
     fprintf(stderr,"  -report [report.md]  Export report summary in Markdown format.\n"); // todo: JSON
@@ -176,7 +182,8 @@ struct args {
 
     int is_pe;
     int chunk_size;
-    
+
+    int mode;    
     struct encode *me_or_ada;
     struct encode *revada;
 
@@ -212,7 +219,8 @@ struct args {
     .mutex = PTHREAD_MUTEX_INITIALIZER,
     .r1_out = NULL,
     .r2_out = NULL,
-    
+
+    .mode = TRIMME,
     .me_or_ada = NULL,
     .revada =NULL,
     .chunk_size = 10000000, // 10M
@@ -250,6 +258,8 @@ int parse_args(int argc, char **argv)
     const char *mini = 0;
     const char *thread = 0;
     const char *record = 0;
+    const char *mode = 0;
+    
     for (i = 1; i < argc;) {
 
         const char *a = argv[i++];
@@ -267,6 +277,7 @@ int parse_args(int argc, char **argv)
         else if (strcmp(a, "-t") == 0) var = &thread;
         else if (strcmp(a, "-tail") == 0) var = &t3;
         else if (strcmp(a, "-r") == 0) var = &record;
+        else if (strcmp(a, "-mode") == 0) var = &mode;
         else if (strcmp(a, "-d") == 0) {
             args.rev_trimmed = 1;
             continue;
@@ -305,13 +316,24 @@ int parse_args(int argc, char **argv)
     if (thread) args.n_thread = str2int((char*)thread);
     if (t3) args.tail_3 = str2int((char*)t3);
     if (record) args.chunk_size = str2int((char*)record);
+    if (mode) {
+        if (strcmp(mode, "Tn5")==0) args.mode = TRIMME;
+        else if (strcmp(mode, "polyA") == 0) args.mode = TRIMPLOYA;
+        else error("Unknown mode, %s", mode);
+    }
     
     args.base_tab = base_tab_init();
     args.rev_tab = base_tab_rev_init();
-    
-    args.me_or_ada = args.adaptor == NULL ? str_encode(me, args.base_tab) : str_encode(args.adaptor, args.base_tab);
-    args.revada = str_encode(rev_me, args.base_tab);
 
+    if (args.mode == TRIMME) {
+        args.me_or_ada = str_encode(me, args.base_tab);
+        args.revada = str_encode(rev_me, args.base_tab);
+    }
+    else if (args.mode == TRIMPLOYA) {
+        args.me_or_ada = str_encode(me, args.base_tab);
+        args.revada = str_encode(rev_me, args.base_tab);    
+    }
+             
     if (args.input_fname1 == NULL && (!isatty(fileno(stdin))))
         args.input_fname1 = "-";    
     if (args.input_fname1 == NULL) error("Fastq file(s) must be set!");
