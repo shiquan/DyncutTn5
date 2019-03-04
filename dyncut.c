@@ -6,7 +6,7 @@
 #include "fastq.h"
 
 #define TRIMME    0
-#define TRIMPLOYA 1
+#define TRIMPOLYA 1
 
 static char * program_name =  "Dyncut";
 
@@ -94,7 +94,7 @@ int usage()
     fprintf(stderr,"  -t [1]               Threads.\n");
     fprintf(stderr,"  -r [10000000]        Records cached per chunk.\n");
     fprintf(stderr,"  -p                   Smart pairing.\n");
-    fprintf(stderr,"  -mode                Trim mode, Tn5 for mosic ends, ployA for ployA tails.[Tn5|ployA]\n");
+    fprintf(stderr,"  -mode                Trim mode, Tn5 for mosic ends, ployA for ployA tails.[Tn5|polyA]\n");
     fprintf(stderr,"  -l [20]              Minimal fragment to keep.\n");
     fprintf(stderr,"  -m [1]               Allowed mismatches.\n");
     fprintf(stderr,"  -report [report.md]  Export report summary in Markdown format.\n"); // todo: JSON
@@ -318,7 +318,7 @@ int parse_args(int argc, char **argv)
     if (record) args.chunk_size = str2int((char*)record);
     if (mode) {
         if (strcmp(mode, "Tn5")==0) args.mode = TRIMME;
-        else if (strcmp(mode, "polyA") == 0) args.mode = TRIMPLOYA;
+        else if (strcmp(mode, "polyA") == 0) args.mode = TRIMPOLYA;
         else error("Unknown mode, %s", mode);
     }
     
@@ -329,7 +329,7 @@ int parse_args(int argc, char **argv)
         args.me_or_ada = str_encode(me, args.base_tab);
         args.revada = str_encode(rev_me, args.base_tab);
     }
-    else if (args.mode == TRIMPLOYA) {
+    else if (args.mode == TRIMPOLYA) {
         args.me_or_ada = str_encode(me, args.base_tab);
         args.revada = str_encode(rev_me, args.base_tab);    
     }
