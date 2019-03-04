@@ -64,8 +64,8 @@ struct trimstat {
 const char *me = "CTGTCTCTTATACACATCTGACGTC";
 //                    CTGTCTCTTATACACATCTGACGTC
 const char *rev_me = "TGTGTATAAGAGACAG";
-const char *ployA = "AAAAAAAAAAAAAAAAA";
-const char *ployT = "TTTTTTTTTTTTTTTTT";
+const char *polyA = "AAAAAAAAAAAAAAAAA";
+const char *polyT = "TTTTTTTTTTTTTTTTT";
 
 // AGCGTCAGATGTGTATAAGAGACAG
 const char *code2seq = "NACNGNNNTNN";
@@ -330,8 +330,8 @@ int parse_args(int argc, char **argv)
         args.revada = str_encode(rev_me, args.base_tab);
     }
     else if (args.mode == TRIMPOLYA) {
-        args.me_or_ada = str_encode(me, args.base_tab);
-        args.revada = str_encode(rev_me, args.base_tab);    
+        args.me_or_ada = str_encode(polyA, args.base_tab);
+        args.revada = str_encode(polyT, args.base_tab);    
     }
              
     if (args.input_fname1 == NULL && (!isatty(fileno(stdin))))
