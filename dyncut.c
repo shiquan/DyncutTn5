@@ -375,7 +375,7 @@ int find_sequence_adaptor(const char *s, const struct encode *a, int m, unsigned
         x = x<<4|(tab[s[i]]&0xf);
         //debug_print("%d\t%d\t%d\t%d\t%d", n, a->l, countbits(x&a->x), a->l -m, i);
         if (++n >= a->l) {
-            if (x == a->x ||countbits(x&a->x) >= a->l - m) return i-a->l;
+            if (x == a->x ||countbits(x&a->x) >= a->l - m) return i-a->l+1;
         }
     }
     // tails
@@ -385,7 +385,7 @@ int find_sequence_adaptor(const char *s, const struct encode *a, int m, unsigned
         mis = mis <= 0 ? 0 : --mis;
         int l1 = a->l - i;
         x1 = x1>>4;
-        if (countbits(x&x1)>= l1 -mis) return l - a->l + i;
+        if (countbits(x&x1)>= l1 -mis) return l - a->l + i+1;
     }
     return -1;
 }
