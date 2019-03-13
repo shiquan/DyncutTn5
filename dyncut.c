@@ -173,7 +173,7 @@ struct args {
     unsigned char *rev_tab;
 
     int order_output; // export all records in order
-    pthread_mutex_t mutex; // lock output 
+    //pthread_mutex_t mutex; // lock output 
     FILE *r1_out; // change gzipped output to normal file, saving time..
     FILE *r2_out;
     
@@ -216,7 +216,7 @@ struct args {
     .fail_fp = NULL,
 
     .order_output = 0,
-    .mutex = PTHREAD_MUTEX_INITIALIZER,
+    //.mutex = PTHREAD_MUTEX_INITIALIZER,
     .r1_out = NULL,
     .r2_out = NULL,
 
@@ -573,9 +573,9 @@ int main(int argc, char **argv)
             if ((r = thread_pool_next_result(q))) {
                 struct bseq_pool *d = (struct bseq_pool *)r->data;
                 struct args *opts = d->opts;
-                pthread_mutex_lock(&opts->mutex);
+                //pthread_mutex_lock(&opts->mutex);
                 write_out(d);
-                pthread_mutex_unlock(&opts->mutex);
+                //pthread_mutex_unlock(&opts->mutex);
             }
             thread_pool_delete_result(r, 0);
         }
@@ -586,9 +586,9 @@ int main(int argc, char **argv)
     while ((r = thread_pool_next_result(q))) {
         struct bseq_pool *d = (struct bseq_pool*)r->data;
         struct args *opts = d->opts;
-        pthread_mutex_lock(&opts->mutex);
+        //pthread_mutex_lock(&opts->mutex);
         write_out(d);
-        pthread_mutex_unlock(&opts->mutex);
+        //pthread_mutex_unlock(&opts->mutex);
         thread_pool_delete_result(r, 0);
     }
 
