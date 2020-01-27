@@ -232,12 +232,12 @@ struct args {
 void memory_release()
 {
     if (args.report_fp) {
-        fprintf(args.report_fp, "All fragments: %llu\n", args.stat.all_fragments);
-        fprintf(args.report_fp, "Trimmed fragments: %llu\n", args.stat.trimmed);
-        fprintf(args.report_fp, "Fragments smaller than %d: %llu\n", args.mini_frag, args.stat.small);
-        fprintf(args.report_fp, "Rev adaptor polluated fragments: %llu\n", args.stat.dropped);
+        fprintf(args.report_fp, "All fragments,%llu\n", args.stat.all_fragments);
+        fprintf(args.report_fp, "Trimmed fragments,%llu\n", args.stat.trimmed);
+        fprintf(args.report_fp, "Fragments smaller than %d,%llu\n", args.mini_frag, args.stat.small);
+        fprintf(args.report_fp, "Rev adaptor polluated fragments,%llu\n", args.stat.dropped);
         uint64_t n_pass = args.stat.all_fragments - args.stat.small - args.stat.dropped;        
-        fprintf(args.report_fp, "Reads passed QC (rate): %llu (%.2f%%)|\n", n_pass*(args.is_pe+1), (float)n_pass/args.stat.all_fragments*100);
+        fprintf(args.report_fp, "Fragments passed QC (rate),%llu\n", n_pass);
         fclose(args.report_fp);
     }
                 
