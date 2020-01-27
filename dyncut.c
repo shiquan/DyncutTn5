@@ -61,7 +61,8 @@ struct trimstat {
 
 // Transposase recognition sequences
 // 19bp Mosaic Ends: CTGTCTCTTATACACATCT
-const char *me = "CTGTCTCTTATACACATCTGACGTC";
+
+const char *me = "CTGTCTCTTATACACATCT";
 //                    CTGTCTCTTATACACATCTGACGTC
 const char *rev_me = "TGTGTATAAGAGACAG";
 const char *polyA = "AAAAAAAAAAAAAAAAA";
